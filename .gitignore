@@ -2,3 +2,6 @@
 node_modules
 lib
 .nyc_output
+
+screenshot.png
+test_plans
