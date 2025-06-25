@@ -2,7 +2,7 @@ import { execFileSync } from "child_process";
 import { Socket } from "net";
 
 import { WebDriverAgent } from "./webdriver-agent";
-import { ActionableError, Button, InstalledApp, Robot, ScreenSize, SwipeDirection, ScreenElement, Orientation } from "./robot";
+import { ActionableError, Button, InstalledApp, Robot, ScreenSize, SwipeDirection, ScreenElement, Orientation, PostureStates } from "./robot";
 
 const WDA_PORT = 8100;
 const IOS_TUNNEL_PORT = 60105;
@@ -194,6 +194,10 @@ export class IosRobot implements Robot {
 	public async getOrientation(): Promise<Orientation> {
 		const wda = await this.wda();
 		return await wda.getOrientation();
+	}
+
+	public async changeDevicePosture(posture: PostureStates): Promise<void> {
+		throw new ActionableError("Posture changing is not supported for iOS");
 	}
 }
 
