@@ -3,7 +3,7 @@ import { execFileSync } from "child_process";
 
 import * as xml from "fast-xml-parser";
 
-import { ActionableError, Button, InstalledApp, Robot, ScreenElement, ScreenElementRect, ScreenSize, SwipeDirection, Orientation } from "./robot";
+import { ActionableError, Button, InstalledApp, Robot, ScreenElement, ScreenElementRect, ScreenSize, SwipeDirection, Orientation, PostureStates } from "./robot";
 
 export interface AndroidDevice {
 	deviceId: string;
@@ -316,6 +316,19 @@ export class AndroidRobot implements Robot {
 	public async getOrientation(): Promise<Orientation> {
 		const rotation = this.adb("shell", "settings", "get", "system", "user_rotation").toString().trim();
 		return rotation === "0" ? "portrait" : "landscape";
+	}
+
+	public async changeDevicePosture(posture: PostureStates): Promise<void> {
+		switch (posture) {
+			case "fold": {
+				this.adb("emu", "fold");
+				break;
+			}
+			case "unfold": {
+				this.adb("emu", "unfold");
+				break;
+			}
+		}
 	}
 
 	private async getUiAutomatorDump(): Promise<string> {

@@ -1,7 +1,7 @@
 import { execFileSync } from "child_process";
 
 import { WebDriverAgent } from "./webdriver-agent";
-import { ActionableError, Button, InstalledApp, Robot, ScreenElement, ScreenSize, SwipeDirection, Orientation } from "./robot";
+import { ActionableError, Button, InstalledApp, Robot, ScreenElement, ScreenSize, SwipeDirection, Orientation, PostureStates } from "./robot";
 
 export interface Simulator {
 	name: string;
@@ -133,6 +133,10 @@ export class Simctl implements Robot {
 	public async getOrientation(): Promise<Orientation> {
 		const wda = await this.wda();
 		return wda.getOrientation();
+	}
+
+	public async changeDevicePosture(posture: PostureStates): Promise<void> {
+		throw new ActionableError("Posture changing is not supported for iOS");
 	}
 }
 

@@ -44,6 +44,8 @@ export class ActionableError extends Error {
 
 export type Orientation = "portrait" | "landscape";
 
+export type PostureStates = "fold" | "unfold";
+
 export interface Robot {
 	/**
 	 * Get the screen size of the device in pixels.
@@ -120,4 +122,9 @@ export interface Robot {
 	 * Get the current screen orientation.
 	 */
 	getOrientation(): Promise<Orientation>;
+
+	/**
+	 * Fold or unfold a device. Possible actions: (fold, unfold)
+	 */
+	changeDevicePosture(posture: PostureStates): Promise<void>;
 }

@@ -474,6 +474,19 @@ export const createMcpServer = (): McpServer => {
 		}
 	);
 
+	tool(
+		"mobile_change_posture",
+		"Fold or unfold the device.",
+		{
+			posture: z.enum(["fold", "unfold"]).describe("The desired posture")
+		},
+		async ({ posture }) => {
+			requireRobot();
+			await robot!.changeDevicePosture(posture);
+			return `Changed device posture to ${posture}`;
+		}
+	);
+
 	// async check for latest agent version
 	checkForLatestAgentVersion().then();
 
