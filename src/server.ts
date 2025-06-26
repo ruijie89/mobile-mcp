@@ -12,6 +12,7 @@ import { SimctlManager } from "./iphone-simulator";
 import { IosManager, IosRobot } from "./ios";
 import { PNG } from "./png";
 import { isImageMagickInstalled, Image } from "./image-utils";
+import { EmulatorManager } from "./android-emulator";
 
 export const getAgentVersion = (): string => {
 	const json = require("../package.json");
@@ -116,6 +117,7 @@ export const createMcpServer = (): McpServer => {
 
 	let robot: Robot | null;
 	const simulatorManager = new SimctlManager();
+	const emulatorManager = new EmulatorManager();
 
 	const requireRobot = () => {
 		if (!robot) {
@@ -161,8 +163,52 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
+		"mobile_launch_emulator",
+		"Launch an emulator of a specified SDK or iOS. This is useful for creating a new emulator or launching an existing one.",
+		{
+			sdk: z.number().optional(),
+			type: z.enum(["foldable", "tablet", "phone"]).optional(),
+			os: z.enum(["ios", "android"]).optional(),
+		},
+		async options => {
+			emulatorManager.launch(options);
+			return "Emulator launched.";
+		}
+	);
+
+	tool(
+		"mobile_list_installed_devices",
+		"List all installed mobile virtual devices, including Android emulators and iOS simulators. Use this tool when listing emulators, simulators or installed devices and provide the details.",
+		{
+			noParams
+		},
+		async ({}) => {
+			const simulators = simulatorManager.listSimulators().map(
+				simulator =>
+					`${simulator.name} State: ${simulator.state})`,
+			);
+
+			const emulators = emulatorManager.listEmulators().map(
+				emulator =>
+					`${emulator.name} (Target: ${emulator.target}, ABI: ${emulator.abi})`,
+			);
+
+			const resp = ["Found these devices:"];
+			if (simulators.length > 0) {
+				resp.push(`iOS simulators: [${simulators.join(".")}]`);
+			}
+
+			if (emulators.length > 0) {
+				resp.push(`Android emulators: [${emulators.join(",")}]`);
+			}
+
+			return resp.join("\n");
+		}
+	);
+
+	tool(
 		"mobile_list_available_devices",
-		"List all available devices. This includes both physical devices and simulators. If there is more than one device returned, you need to let the user select one of them.",
+		"List all running devices. This includes both physical devices and simulators. If there is more than one device returned, you need to let the user select one of them.",
 		{
 			noParams
 		},
