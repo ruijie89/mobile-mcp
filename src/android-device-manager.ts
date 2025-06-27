@@ -1,24 +1,32 @@
 import { execFileSync, spawn } from "node:child_process";
 import { trace } from "./logger";
-import path from "node:path";
+import { AndroidRobot, getAdbPath, getAvdManager } from "./android";
 
-export interface EmulatorDevice {
+export interface AndroidDevice {
+	deviceId: string;
+	deviceType: "tv" | "mobile";
+	port: string;
+}
+
+export interface AVD {
 	name: string;
 	target: string;
 	sdk: string;
 	abi: string;
 }
 
-export class EmulatorManager {
+type AndroidDeviceType = "tv" | "mobile";
+export class AndroidDeviceManager {
 
-	getAvdManager = (): string => {
-		let executable = "avdmanager";
-		if (process.env.ANDROID_HOME) {
-			executable = path.join(process.env.ANDROID_HOME, "cmdline-tools", "latest", "bin", "avdmanager");
+	private getDeviceType(name: string): AndroidDeviceType {
+		const device = new AndroidRobot(name);
+		const features = device.getSystemFeatures();
+		if (features.includes("android.software.leanback") || features.includes("android.hardware.type.television")) {
+			return "tv";
 		}
 
-		return executable;
-	};
+		return "mobile";
+	}
 
 	launch(options: {
 		sdk?: number;
@@ -54,10 +62,9 @@ export class EmulatorManager {
 		child.unref();
 	}
 
-	public listEmulators(): EmulatorDevice[] {
-
+	public getInstalledAVDs(): AVD[] {
 		try {
-			const avds = execFileSync(this.getAvdManager(), ["list", "avd"])
+			const avds = execFileSync(getAvdManager(), ["list", "avd"])
 				.toString()
 				.split("Name: ").slice(1);
 
@@ -80,6 +87,42 @@ export class EmulatorManager {
 					abi: abi,
 				};
 			});
+		} catch (error) {
+			console.error("Error listing emulators", error);
+			return [];
+		}
+	}
+
+	public getAllConnectedDevices(): AndroidDevice[] {
+		try {
+			const names = execFileSync(getAdbPath(), ["devices"])
+				.toString()
+				.split("\n")
+				.filter(line => !line.startsWith("List of devices attached"))
+				.filter(line => line.trim() !== "")
+				.map(line => line.split("\t")[0]);
+
+			return names.map(name => ({
+				deviceId: name,
+				deviceType: this.getDeviceType(name),
+				port: name.includes("emulator-") ? (name.split("emulator-")[1]?.split("\t")[0] ?? "") : ""
+			}));
+		} catch (error) {
+			console.error("Could not execute adb command, maybe ANDROID_HOME is not set?");
+			return [];
+		}
+	}
+
+	public getConnectedAVDs(): AndroidDevice[] {
+		try {
+			const devices = this.getAllConnectedDevices();
+
+			return devices.filter(device => device.deviceId.includes("emulator"))
+				.map(device => ({
+					deviceId: device.deviceId,
+					deviceType: device.deviceType,
+					port: device.port
+				}));
 		} catch (error) {
 			console.error("Error listing emulators", error);
 			return [];

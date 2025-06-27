@@ -6,13 +6,13 @@ import os from "node:os";
 import crypto from "node:crypto";
 
 import { error, trace } from "./logger";
-import { AndroidRobot, AndroidDeviceManager } from "./android";
+import { AndroidRobot } from "./android";
 import { ActionableError, Robot } from "./robot";
 import { SimctlManager } from "./iphone-simulator";
 import { IosManager, IosRobot } from "./ios";
 import { PNG } from "./png";
 import { isImageMagickInstalled, Image } from "./image-utils";
-import { EmulatorManager } from "./android-emulator";
+import { AndroidDeviceManager } from "./android-device-manager";
 
 export const getAgentVersion = (): string => {
 	const json = require("../package.json");
@@ -117,7 +117,7 @@ export const createMcpServer = (): McpServer => {
 
 	let robot: Robot | null;
 	const simulatorManager = new SimctlManager();
-	const emulatorManager = new EmulatorManager();
+	const emulatorManager = new AndroidDeviceManager();
 
 	const requireRobot = () => {
 		if (!robot) {
@@ -135,7 +135,7 @@ export const createMcpServer = (): McpServer => {
 			const iosManager = new IosManager();
 			const androidManager = new AndroidDeviceManager();
 			const simulators = simulatorManager.listBootedSimulators();
-			const androidDevices = androidManager.getConnectedDevices();
+			const androidDevices = androidManager.getAllConnectedDevices();
 			const iosDevices = iosManager.listDevices();
 
 			const sum = simulators.length + androidDevices.length + iosDevices.length;
@@ -163,22 +163,33 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_launch_emulator",
-		"Launch an emulator of a specified SDK or iOS. This is useful for creating a new emulator or launching an existing one.",
+		"mobile_launch_device",
+		"Use this tool when launching a virtual device of a specified SDK or iOS. This is useful for creating a new Android emulator or iOS simulator or launching an existing one.",
 		{
 			sdk: z.number().optional(),
 			type: z.enum(["foldable", "tablet", "phone"]).optional(),
 			os: z.enum(["ios", "android"]).optional(),
 		},
 		async options => {
-			emulatorManager.launch(options);
-			return "Emulator launched.";
+
+			switch (options.os) {
+				case "android": {
+					emulatorManager.launch(options);
+					return "Emulator launched.";
+				}
+				case "ios": {
+					return "Simulator launched.";
+				}
+				default: {
+					throw new Error(" Unexpected OS.");
+				}
+			}
 		}
 	);
 
 	tool(
 		"mobile_list_installed_devices",
-		"List all installed mobile virtual devices, including Android emulators and iOS simulators. Use this tool when listing emulators, simulators or installed devices and provide the details.",
+		"Use this tool when listing all installed mobile virtual devices, including Android emulators and iOS simulators. Provide the details",
 		{
 			noParams
 		},
@@ -188,7 +199,7 @@ export const createMcpServer = (): McpServer => {
 					`${simulator.name} State: ${simulator.state})`,
 			);
 
-			const emulators = emulatorManager.listEmulators().map(
+			const emulators = emulatorManager.getInstalledAVDs().map(
 				emulator =>
 					`${emulator.name} (Target: ${emulator.target}, ABI: ${emulator.abi})`,
 			);
@@ -207,8 +218,38 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_available_devices",
-		"List all running devices. This includes both physical devices and simulators. If there is more than one device returned, you need to let the user select one of them.",
+		"mobile_list_running_virtual_devices",
+		"Use this tool when listing all running virtual devices, including Android emulators and iOS simulators. Provide the ports if available.",
+		{
+			noParams
+		},
+		async ({}) => {
+			const simulators = simulatorManager.listBootedSimulators().map(
+				simulator =>
+					`${simulator.name} State: ${simulator.state})`,
+			);
+
+			const emulators = emulatorManager.getConnectedAVDs().map(
+				emulator =>
+					`${emulator.deviceId} (Port: ${emulator.port})`,
+			);
+
+			const resp = ["Found these devices:"];
+			if (simulators.length > 0) {
+				resp.push(`iOS simulators: [${simulators.join(".")}]`);
+			}
+
+			if (emulators.length > 0) {
+				resp.push(`Android emulators: [${emulators.join(",")}]`);
+			}
+
+			return resp.join("\n");
+		}
+	);
+
+	tool(
+		"mobile_list_running_devices",
+		"Use this tool when listing all running devices, including both physical & virtual devices. If there is more than one device returned, you need to let the user select one of them.",
 		{
 			noParams
 		},
@@ -217,7 +258,7 @@ export const createMcpServer = (): McpServer => {
 			const androidManager = new AndroidDeviceManager();
 			const simulators = simulatorManager.listBootedSimulators();
 			const simulatorNames = simulators.map(d => d.name);
-			const androidDevices = androidManager.getConnectedDevices();
+			const androidDevices = androidManager.getAllConnectedDevices();
 			const iosDevices = await iosManager.listDevices();
 			const iosDeviceNames = iosDevices.map(d => d.deviceId);
 			const androidTvDevices = androidDevices.filter(d => d.deviceType === "tv").map(d => d.deviceId);
