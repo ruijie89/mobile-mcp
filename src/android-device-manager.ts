@@ -1,5 +1,4 @@
 import { execFileSync, spawn } from "node:child_process";
-import { trace } from "./logger";
 import { AndroidRobot, getAdbPath, getAvdManager, getSdkManager } from "./android";
 
 export interface AndroidDevice {
@@ -26,40 +25,6 @@ export class AndroidDeviceManager {
 		}
 
 		return "mobile";
-	}
-
-	launch(options: {
-		sdk?: number;
-		type?: "foldable" | "tablet" | "phone";
-		os?: "ios" | "android";
-	}) {
-		const { sdk, type, os = "android" } = options;
-		if (os === "android") {
-			this.launchAndroid(sdk, type);
-		} else {
-			throw new Error("iOS emulators are not supported yet.");
-		}
-	}
-
-	private launchAndroid(sdk?: number, type?: "foldable" | "tablet" | "phone") {
-		const sdkPath = process.env.ANDROID_HOME;
-		if (!sdkPath) {
-			throw new Error(
-				"ANDROID_HOME environment variable is not set. Please set it to your Android SDK path."
-			);
-		}
-		// const avdManager = `${sdkPath}/cmdline-tools/latest/bin/avdmanager`;
-		const emulator = `${sdkPath}/emulator/emulator`;
-
-		// TO-DO: avdmanager create avd -n "foldable" -d "pixel_fold" --package "system-images;android-35;google_apis;x86_64"
-		const command = `-avd foldable`;
-		trace(`exec: ${emulator} ${command}`);
-
-		const child = spawn(emulator, command.split(" "), {
-			detached: true,
-			stdio: "ignore",
-		});
-		child.unref();
 	}
 
 	public getInstalledAVDs(): AVD[] {
@@ -141,6 +106,37 @@ export class AndroidDeviceManager {
 		} catch (error) {
 			console.error("Error listing Android SDKs", error);
 			return [];
+		}
+	}
+
+	public createOrLaunchAVD(avdName: string, sdkPath: string, abi: string, device: string): string {
+		const avds = this.getInstalledAVDs();
+		const avdExists = avds.some(avd => avd.name === avdName);
+		const avdManager = getAvdManager();
+		const emulatorPath = process.env.ANDROID_HOME + "/emulator/emulator";
+		if (!avdExists) {
+			try {
+				execFileSync(avdManager, [
+					"create", "avd",
+					"-n", avdName,
+					"-d", device,
+					"-k", sdkPath,
+					"--abi", abi,
+					"--force"
+				], { stdio: "inherit" });
+			} catch (e) {
+				return `Failed to create AVD: ${e}`;
+			}
+		}
+		// Launch the emulator
+		try {
+			spawn(emulatorPath, ["-avd", avdName], {
+				detached: true,
+				stdio: "ignore",
+			});
+			return avdExists ? `Launched existing AVD: ${avdName}` : `Created and launched new AVD: ${avdName}`;
+		} catch (e) {
+			return `Failed to launch emulator: ${e}`;
 		}
 	}
 }

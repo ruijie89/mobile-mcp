@@ -164,26 +164,36 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_launch_device",
-		"Use this tool when launching a virtual device of a specified SDK or iOS. This is useful for creating a new Android emulator or iOS simulator or launching an existing one.",
+		"Launch or create and launch an Android emulator or iOS simulator. Parameters are unified for both platforms.",
 		{
-			sdk: z.number().optional(),
-			type: z.enum(["foldable", "tablet", "phone"]).optional(),
-			os: z.enum(["ios", "android"]).optional(),
+			os: z.enum(["ios", "android"]),
+			systemImage: z.string().optional(), // Android system image path
+			runtimeId: z.string().optional(), // iOS runtime identifier
+			deviceType: z.string().optional(), // Device type for both platforms
+			name: z.string().optional(), // AVD or simulator name
+			abi: z.string().optional(), // Android ABI
 		},
 		async options => {
-
-			switch (options.os) {
-				case "android": {
-					emulatorManager.launch(options);
-					return "Emulator launched.";
+			if (options.os === "android") {
+				if (!options.systemImage) {
+					throw new ActionableError("You must specify systemImage (Android system image path) for Android emulator.");
 				}
-				case "ios": {
-					return "Simulator launched.";
-				}
-				default: {
-					throw new Error(" Unexpected OS.");
-				}
+				const abi = options.abi || "arm64-v8a"; // Default ABI, can be improved by parsing systemImage
+				const avdName = options.name || `mcp_avd_${options.systemImage.replace(/[^a-zA-Z0-9]/g, "_")}`;
+				const deviceType = options.deviceType || "pixel_5";
+				const result = emulatorManager.createOrLaunchAVD(avdName, options.systemImage, abi, deviceType);
+				return result;
 			}
+			if (options.os === "ios") {
+				if (!options.runtimeId) {
+					throw new ActionableError("You must specify runtimeId for iOS simulator.");
+				}
+				const simName = options.name || `mcp_sim_${options.runtimeId.replace(/[^a-zA-Z0-9]/g, "_")}`;
+				const deviceType = options.deviceType || "iPhone 14";
+				const result = simulatorManager.createOrLaunchSimulator(simName, options.runtimeId, deviceType);
+				return result;
+			}
+			throw new Error("Unexpected OS. Specify 'android' or 'ios'.");
 		}
 	);
 
