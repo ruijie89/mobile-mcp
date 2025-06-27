@@ -248,7 +248,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_running_devices",
+		"mobile_list_all_running_devices",
 		"Use this tool when listing all running devices, including both physical & virtual devices. If there is more than one device returned, you need to let the user select one of them.",
 		{
 			noParams
@@ -585,6 +585,27 @@ export const createMcpServer = (): McpServer => {
 			requireRobot();
 			await robot!.changeDevicePosture(posture);
 			return `Changed device posture to ${posture}`;
+		}
+	);
+
+	tool(
+		"mobile_list_mobile_system_images",
+		"List the available SDKs to create AVDs in Android, and list the available runtimes for simctl to create simulators for iOS.",
+		{
+			noParams
+		},
+		async ({}) => {
+			const androidSdks = emulatorManager.listAvailableAndroidSdks();
+			const iosRuntimes = simulatorManager.listAvailableIosRuntimes();
+
+			const androidList = androidSdks.length > 0
+				? androidSdks.map(sdk => `- ${sdk.path}: ${sdk.description}`).join("\n")
+				: "No Android system images found.";
+			const iosList = iosRuntimes.length > 0
+				? iosRuntimes.map((rt: { name: string; identifier: string }) => `- ${rt.name} (${rt.identifier})`).join("\n")
+				: "No iOS runtimes found.";
+
+			return `Available Android SDK system images:\n${androidList}\n\nAvailable iOS runtimes:\n${iosList}`;
 		}
 	);
 

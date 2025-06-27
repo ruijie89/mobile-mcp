@@ -10,6 +10,11 @@ export interface Simulator {
 	state: string;
 }
 
+// Standalone interface for iOS runtimes
+export interface IosRuntime {
+	name: string;
+	identifier: string;
+}
 interface ListDevicesResponse {
 	devices: {
 		[key: string]: Array<{
@@ -214,5 +219,26 @@ export class SimctlManager {
 
 	public getSimulator(uuid: string): Simctl {
 		return new Simctl(uuid);
+	}
+
+	// Standalone function to list available iOS runtimes
+	public listAvailableIosRuntimes(): IosRuntime[] {
+		try {
+			const output = execFileSync("xcrun", ["simctl", "list", "runtimes"]).toString();
+			const lines = output.split("\n");
+			return lines
+				.filter(line => line.trim().startsWith("iOS "))
+				.map(line => {
+					const match = line.match(/^(iOS [^\(]+) \([^)]+\) - ([^\s]+)/);
+					if (match) {
+						return { name: match[1].trim(), identifier: match[2].trim() };
+					}
+					return null;
+				})
+				.filter(Boolean) as IosRuntime[];
+		} catch (error) {
+			console.error("Error listing iOS runtimes", error);
+			return [];
+		}
 	}
 }

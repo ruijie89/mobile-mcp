@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { trace } from "./logger";
-import { AndroidRobot, getAdbPath, getAvdManager } from "./android";
+import { AndroidRobot, getAdbPath, getAvdManager, getSdkManager } from "./android";
 
 export interface AndroidDevice {
 	deviceId: string;
@@ -125,6 +125,21 @@ export class AndroidDeviceManager {
 				}));
 		} catch (error) {
 			console.error("Error listing emulators", error);
+			return [];
+		}
+	}
+
+	public listAvailableAndroidSdks(): { path: string; description: string }[] {
+		try {
+			const output = execFileSync(getSdkManager(), ["--list"]).toString();
+			const lines = output.split("\n");
+			const sdkLines = lines.filter(line => line.trim().startsWith("system-images;"));
+			return sdkLines.map(line => {
+				const [path, , description] = line.split("|").map(s => s.trim());
+				return { path, description };
+			});
+		} catch (error) {
+			console.error("Error listing Android SDKs", error);
 			return [];
 		}
 	}

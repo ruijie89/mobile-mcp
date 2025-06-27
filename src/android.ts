@@ -45,6 +45,15 @@ export const getAvdManager = (): string => {
 	return executable;
 };
 
+export const getSdkManager = (): string => {
+	let executable = "sdkmanager";
+	if (process.env.ANDROID_HOME) {
+		executable = path.join(process.env.ANDROID_HOME, "cmdline-tools", "latest", "bin", "sdkmanager");
+	}
+
+	return executable;
+};
+
 const BUTTON_MAP: Record<Button, string> = {
 	"BACK": "KEYCODE_BACK",
 	"HOME": "KEYCODE_HOME",
