@@ -416,8 +416,4 @@ export class AndroidRobot implements Robot {
 			height: bottom - top,
 		};
 	}
-
-	static terminateEmulator(deviceId: string): void {
-		execFileSync(getAdbPath(), ["-s", deviceId, "emu", "kill"]);
-	}
 }

@@ -160,4 +160,8 @@ export class AndroidDeviceManager {
 			return `Failed to launch emulator: ${e}`;
 		}
 	}
+
+	static terminateEmulator(deviceId: string): void {
+		execFileSync(getAdbPath(), ["-s", deviceId, "emu", "kill"]);
+	}
 }
