@@ -183,6 +183,13 @@ export class Simctl implements Robot {
 	public async changeDevicePosture(posture: PostureStates): Promise<void> {
 		throw new ActionableError("Posture changing is not supported for iOS");
 	}
+
+	public async installApp(options: { ipaPath?: string }): Promise<void> {
+		if (!options.ipaPath) {
+			throw new ActionableError("You must provide ipaPath to install an app on iOS simulator.");
+		}
+		this.simctl("install", this.simulatorUuid, options.ipaPath);
+	}
 }
 
 export class SimctlManager {

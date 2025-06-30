@@ -131,7 +131,30 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async launchApp(packageName: string): Promise<void> {
-		this.adb("shell", "monkey", "-p", packageName, "-c", "android.intent.category.LAUNCHER", "1");
+		// 1. Check if the package exists
+		const packages = await this.listPackages();
+		if (!packages.includes(packageName)) {
+			throw new ActionableError(`Package ${packageName} is not installed on the device.`);
+		}
+
+		// 2. Get the main activity of the package
+		let mainActivity = "";
+		try {
+			const output = this.adb("shell", "cmd", "package", "resolve-activity", "--brief", packageName)
+				.toString()
+				.trim()
+				.split("\n");
+			// The last line should be the component name: package/activity
+			mainActivity = output[output.length - 1];
+			if (!mainActivity.includes("/")) {
+				throw new Error();
+			}
+		} catch {
+			throw new ActionableError(`Could not resolve main activity for package ${packageName}.`);
+		}
+
+		// 3. Launch the app using the main activity
+		this.adb("shell", "am", "start", "-n", mainActivity);
 	}
 
 	public async listRunningProcesses(): Promise<string[]> {
@@ -346,6 +369,13 @@ export class AndroidRobot implements Robot {
 				break;
 			}
 		}
+	}
+
+	public async installApp(options: { apkPath?: string }): Promise<void> {
+		if (!options.apkPath) {
+			throw new ActionableError("You must provide apkPath to install an app on Android.");
+		}
+		this.adb("install", "-r", options.apkPath);
 	}
 
 	private async getUiAutomatorDump(): Promise<string> {

@@ -127,4 +127,10 @@ export interface Robot {
 	 * Fold or unfold a device. Possible actions: (fold, unfold)
 	 */
 	changeDevicePosture(posture: PostureStates): Promise<void>;
+
+	/**
+	 * Install an app on the device.
+	 * For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl.
+	 */
+	installApp(options: { apkPath?: string; ipaPath?: string; testflightUrl?: string }): Promise<void>;
 }

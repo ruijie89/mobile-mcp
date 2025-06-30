@@ -619,6 +619,29 @@ export const createMcpServer = (): McpServer => {
 		}
 	);
 
+	tool(
+		"mobile_install_app",
+		"Install an app on the mobile device. For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl.",
+		{
+			apkPath: z.string().optional().describe("Path to the APK file for Android."),
+			ipaPath: z.string().optional().describe("Path to the IPA file for iOS simulator."),
+			testflightUrl: z.string().optional().describe("TestFlight public link for iOS device."),
+		},
+		async ({ apkPath, ipaPath, testflightUrl }) => {
+			requireRobot();
+			await robot!.installApp({ apkPath, ipaPath, testflightUrl });
+			if (apkPath) {
+				return `Attempted to install APK: ${apkPath}`;
+			} else if (ipaPath) {
+				return `Attempted to install IPA: ${ipaPath}`;
+			} else if (testflightUrl) {
+				return `Attempted to open TestFlight link: ${testflightUrl}`;
+			} else {
+				return `No install parameters provided.`;
+			}
+		}
+	);
+
 	// async check for latest agent version
 	checkForLatestAgentVersion().then();
 
