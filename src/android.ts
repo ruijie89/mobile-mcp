@@ -175,29 +175,29 @@ export class AndroidRobot implements Robot {
 		switch (direction) {
 			case "up":
 				x0 = x1 = centerX;
-				y0 = Math.floor(screenSize.height * 0.80);
-				y1 = Math.floor(screenSize.height * 0.20);
+				y0 = Math.floor(screenSize.height * 0.90);
+				y1 = Math.floor(screenSize.height * 0.10);
 				break;
 			case "down":
 				x0 = x1 = centerX;
-				y0 = Math.floor(screenSize.height * 0.20);
-				y1 = Math.floor(screenSize.height * 0.80);
+				y0 = Math.floor(screenSize.height * 0.10);
+				y1 = Math.floor(screenSize.height * 0.90);
 				break;
 			case "left":
-				x0 = Math.floor(screenSize.width * 0.80);
-				x1 = Math.floor(screenSize.width * 0.20);
+				x0 = Math.floor(screenSize.width * 0.90);
+				x1 = Math.floor(screenSize.width * 0.10);
 				y0 = y1 = Math.floor(screenSize.height * 0.50);
 				break;
 			case "right":
-				x0 = Math.floor(screenSize.width * 0.20);
-				x1 = Math.floor(screenSize.width * 0.80);
+				x0 = Math.floor(screenSize.width * 0.10);
+				x1 = Math.floor(screenSize.width * 0.90);
 				y0 = y1 = Math.floor(screenSize.height * 0.50);
 				break;
 			default:
 				throw new ActionableError(`Swipe direction "${direction}" is not supported`);
 		}
 
-		this.adb("shell", "input", "swipe", `${x0}`, `${y0}`, `${x1}`, `${y1}`, "1000");
+		this.adb("shell", "input", "touchscreen", "swipe", `${x0}`, `${y0}`, `${x1}`, `${y1}`, "400");
 	}
 
 	public async swipeFromCoordinate(x: number, y: number, direction: SwipeDirection, distance?: number): Promise<void> {

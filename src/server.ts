@@ -483,7 +483,7 @@ export const createMcpServer = (): McpServer => {
 			direction: z.enum(["up", "down", "left", "right"]).describe("The direction to swipe"),
 			x: z.number().optional().describe("The x coordinate to start the swipe from, in pixels. If not provided, uses center of screen"),
 			y: z.number().optional().describe("The y coordinate to start the swipe from, in pixels. If not provided, uses center of screen"),
-			distance: z.number().optional().describe("The distance to swipe in pixels. Defaults to 400 pixels for iOS or 30% of screen dimension for Android"),
+			distance: z.number().optional().describe("The distance to swipe in pixels. Defaults to 50% of screen dimension for Android and iOS"),
 		},
 		async ({ direction, x, y, distance }) => {
 			requireRobot();

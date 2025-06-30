@@ -149,6 +149,8 @@ export class AndroidDeviceManager {
 						execFileSync(getAdbPath(), ["-s", deviceId, "shell", "settings", "put", "global", "development_settings_enabled", "1"]);
 						// Enable show touches
 						execFileSync(getAdbPath(), ["-s", deviceId, "shell", "settings", "put", "system", "show_touches", "1"]);
+						// Enable show pointer location and paths
+						execFileSync(getAdbPath(), ["-s", deviceId, "shell", "settings", "put", "system", "pointer_location", "1"]);
 					}
 				} catch (err) {
 					console.error("Failed to enable developer options or show touches:", err);
