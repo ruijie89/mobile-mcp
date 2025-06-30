@@ -10,6 +10,11 @@ export interface Simulator {
 	state: string;
 }
 
+// Standalone interface for iOS runtimes
+export interface IosRuntime {
+	name: string;
+	identifier: string;
+}
 interface ListDevicesResponse {
 	devices: {
 		[key: string]: Array<{
@@ -214,5 +219,59 @@ export class SimctlManager {
 
 	public getSimulator(uuid: string): Simctl {
 		return new Simctl(uuid);
+	}
+
+	// Standalone function to list available iOS runtimes
+	public listAvailableIosRuntimes(): IosRuntime[] {
+		try {
+			const output = execFileSync("xcrun", ["simctl", "list", "runtimes"]).toString();
+			const lines = output.split("\n");
+			return lines
+				.filter(line => line.trim().startsWith("iOS "))
+				.map(line => {
+					const match = line.match(/^(iOS [^\(]+) \([^)]+\) - ([^\s]+)/);
+					if (match) {
+						return { name: match[1].trim(), identifier: match[2].trim() };
+					}
+					return null;
+				})
+				.filter(Boolean) as IosRuntime[];
+		} catch (error) {
+			console.error("Error listing iOS runtimes", error);
+			return [];
+		}
+	}
+
+	public createOrLaunchSimulator(simName: string, runtimeId: string, deviceType: string = "iPhone 14"): string {
+		const simulators = this.listSimulators();
+		const found = simulators.find(sim => sim.name === simName && runtimeId && sim.state !== undefined);
+		if (!found) {
+			try {
+				execFileSync("xcrun", ["simctl", "create", simName, deviceType, runtimeId], { stdio: "inherit" });
+			} catch (e) {
+				return `Failed to create simulator: ${e}`;
+			}
+		}
+		// Find the UUID of the simulator
+		const updatedSims = this.listSimulators();
+		const sim = updatedSims.find(s => s.name === simName && runtimeId && s.state !== undefined);
+		if (!sim) {
+			return `Simulator creation failed or not found.`;
+		}
+		try {
+			execFileSync("xcrun", ["simctl", "boot", sim.uuid], { stdio: "inherit" });
+			// Open Simulator app if not running
+			try {
+				const isRunning = execFileSync("pgrep", ["-x", "Simulator"]).toString().trim().length > 0;
+				if (!isRunning) {
+					execFileSync("open", ["-a", "Simulator"]);
+				}
+			} catch (e) {
+				// Ignore errors from pgrep/open
+			}
+			return found ? `Booted existing simulator: ${simName}` : `Created and booted new simulator: ${simName}`;
+		} catch (e) {
+			return `Failed to boot simulator: ${e}`;
+		}
 	}
 }

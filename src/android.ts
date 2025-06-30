@@ -27,10 +27,28 @@ interface UiAutomatorXml {
 	};
 }
 
-const getAdbPath = (): string => {
+export const getAdbPath = (): string => {
 	let executable = "adb";
 	if (process.env.ANDROID_HOME) {
 		executable = path.join(process.env.ANDROID_HOME, "platform-tools", "adb");
+	}
+
+	return executable;
+};
+
+export const getAvdManager = (): string => {
+	let executable = "avdmanager";
+	if (process.env.ANDROID_HOME) {
+		executable = path.join(process.env.ANDROID_HOME, "cmdline-tools", "latest", "bin", "avdmanager");
+	}
+
+	return executable;
+};
+
+export const getSdkManager = (): string => {
+	let executable = "sdkmanager";
+	if (process.env.ANDROID_HOME) {
+		executable = path.join(process.env.ANDROID_HOME, "cmdline-tools", "latest", "bin", "sdkmanager");
 	}
 
 	return executable;
@@ -51,8 +69,6 @@ const BUTTON_MAP: Record<Button, string> = {
 
 const TIMEOUT = 30000;
 const MAX_BUFFER_SIZE = 1024 * 1024 * 4;
-
-type AndroidDeviceType = "tv" | "mobile";
 
 export class AndroidRobot implements Robot {
 
@@ -369,38 +385,5 @@ export class AndroidRobot implements Robot {
 			width: right - left,
 			height: bottom - top,
 		};
-	}
-}
-
-export class AndroidDeviceManager {
-
-	private getDeviceType(name: string): AndroidDeviceType {
-		const device = new AndroidRobot(name);
-		const features = device.getSystemFeatures();
-		if (features.includes("android.software.leanback") || features.includes("android.hardware.type.television")) {
-			return "tv";
-		}
-
-		return "mobile";
-	}
-
-	public getConnectedDevices(): AndroidDevice[] {
-		try {
-			const names = execFileSync(getAdbPath(), ["devices"])
-				.toString()
-				.split("\n")
-				.map(line => line.trim())
-				.filter(line => line !== "")
-				.filter(line => !line.startsWith("List of devices attached"))
-				.map(line => line.split("\t")[0]);
-
-			return names.map(name => ({
-				deviceId: name,
-				deviceType: this.getDeviceType(name),
-			}));
-		} catch (error) {
-			console.error("Could not execute adb command, maybe ANDROID_HOME is not set?");
-			return [];
-		}
 	}
 }
