@@ -267,15 +267,8 @@ export class SimctlManager {
 		}
 		try {
 			execFileSync("xcrun", ["simctl", "boot", sim.uuid], { stdio: "inherit" });
-			// Open Simulator app if not running
-			try {
-				const isRunning = execFileSync("pgrep", ["-x", "Simulator"]).toString().trim().length > 0;
-				if (!isRunning) {
-					execFileSync("open", ["-a", "Simulator"]);
-				}
-			} catch (e) {
-				// Ignore errors from pgrep/open
-			}
+			// Always open the Simulator app to ensure it is visible
+			execFileSync("open", ["-a", "Simulator"]);
 			return found ? `Booted existing simulator: ${simName}` : `Created and booted new simulator: ${simName}`;
 		} catch (e) {
 			return `Failed to boot simulator: ${e}`;
