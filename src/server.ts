@@ -198,7 +198,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_installed_devices",
+		"mobile_list_installed_virtual_devices",
 		"Use this tool when listing all installed mobile virtual devices, including Android emulators and iOS simulators. Provide the details",
 		{
 			noParams
@@ -316,6 +316,34 @@ export const createMcpServer = (): McpServer => {
 			}
 
 			return `Selected device: ${device}`;
+		}
+	);
+
+	tool(
+		"mobile_terminate_virtual_device",
+		"Terminate a specified device (Android emulator or iOS simulator) by deviceId/uuid.",
+		{
+			deviceId: z.string().describe("The deviceId (for Android) or uuid (for iOS simulator) to terminate"),
+			deviceType: z.enum(["android", "simulator"]).describe("The type of device: 'android' for emulator, 'simulator' for iOS simulator"),
+		},
+		async ({ deviceId, deviceType }) => {
+			if (deviceType === "android") {
+				try {
+					AndroidRobot.terminateEmulator(deviceId);
+					return `Terminated Android emulator: ${deviceId}`;
+				} catch (err: any) {
+					throw new ActionableError(`Failed to terminate Android emulator: ${err.message}`);
+				}
+			} else if (deviceType === "simulator") {
+				try {
+					SimctlManager.terminateSimulator(deviceId);
+					return `Terminated iOS simulator: ${deviceId}`;
+				} catch (err: any) {
+					throw new ActionableError(`Failed to terminate iOS simulator: ${err.message}`);
+				}
+			} else {
+				throw new ActionableError("Unsupported deviceType. Use 'android' or 'simulator'.");
+			}
 		}
 	);
 

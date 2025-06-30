@@ -134,6 +134,27 @@ export class AndroidDeviceManager {
 				detached: true,
 				stdio: "ignore",
 			});
+
+			// Wait for the emulator to boot and enable developer options and show touches
+			setTimeout(() => {
+				try {
+					// Find the emulator device id
+					const devicesOutput = execFileSync(getAdbPath(), ["devices"]).toString();
+					const lines = devicesOutput.split("\n").filter(line => line.includes("emulator-"));
+					if (lines.length > 0) {
+						const deviceId = lines[0].split("\t")[0];
+						// Wait for device to be fully booted
+						execFileSync(getAdbPath(), ["-s", deviceId, "wait-for-device"]);
+						// Enable developer options
+						execFileSync(getAdbPath(), ["-s", deviceId, "shell", "settings", "put", "global", "development_settings_enabled", "1"]);
+						// Enable show touches
+						execFileSync(getAdbPath(), ["-s", deviceId, "shell", "settings", "put", "system", "show_touches", "1"]);
+					}
+				} catch (err) {
+					console.error("Failed to enable developer options or show touches:", err);
+				}
+			}, 10000); // Wait 10 seconds before running adb commands
+
 			return avdExists ? `Launched existing AVD: ${avdName}` : `Created and launched new AVD: ${avdName}`;
 		} catch (e) {
 			return `Failed to launch emulator: ${e}`;

@@ -274,4 +274,8 @@ export class SimctlManager {
 			return `Failed to boot simulator: ${e}`;
 		}
 	}
+
+	static terminateSimulator(uuid: string): void {
+		execFileSync("xcrun", ["simctl", "shutdown", uuid]);
+	}
 }
