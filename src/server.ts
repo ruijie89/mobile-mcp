@@ -377,6 +377,22 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
+		"mobile_uninstall_app",
+		"Uninstall an app from the mobile device. Provide the package name (Android) or the bundle identifier (iOS) of the app to uninstall.",
+		{
+			appIdentifier: z.string().describe("The package name (Android) or bundle identifier (iOS) of the app to uninstall"),
+		},
+		async ({ appIdentifier }) => {
+			requireRobot();
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+
+			await robot!.uninstallApp(appIdentifier);
+			return `Uninstalled app ${appIdentifier}.`;
+
+		}
+	);
+
+	tool(
 		"mobile_get_screen_size",
 		"Get the screen size of the mobile device in pixels",
 		{
@@ -675,6 +691,7 @@ export const createMcpServer = (): McpServer => {
 			return `Stopped video recording.`;
 		}
 	);
+
 
 	// async check for latest agent version
 	checkForLatestAgentVersion().then();

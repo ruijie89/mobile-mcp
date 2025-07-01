@@ -458,4 +458,8 @@ export class AndroidRobot implements Robot {
 		}
 		this.videoRecordingPid = null;
 	}
+
+	public async uninstallApp(packageName: string): Promise<void> {
+		this.adb("shell", "pm", "uninstall", packageName);
+	}
 }

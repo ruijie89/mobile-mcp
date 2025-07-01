@@ -133,4 +133,10 @@ export interface Robot {
 	 * For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl.
 	 */
 	installApp(options: { apkPath?: string; ipaPath?: string; testflightUrl?: string }): Promise<void>;
+
+	/**
+	 * Uninstall an app from the device.
+	 * @param appIdentifier The unique application identifier (Android: package name, iOS: bundle identifier)
+	 */
+	uninstallApp(appIdentifier: string): Promise<void>;
 }
