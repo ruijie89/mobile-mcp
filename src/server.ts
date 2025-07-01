@@ -1,7 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { z, ZodRawShape, ZodTypeAny } from "zod";
-import fs from "node:fs";
 import os from "node:os";
 import crypto from "node:crypto";
 
@@ -520,9 +519,16 @@ export const createMcpServer = (): McpServer => {
 		async ({ saveTo }) => {
 			requireRobot();
 
-			const screenshot = await robot!.getScreenshot();
-			fs.writeFileSync(saveTo, screenshot);
-			return `Screenshot saved to: ${saveTo}`;
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+
+			if (robot instanceof AndroidRobot) {
+				await robot.saveScreenshotToFile(saveTo);
+				return `Screenshot saved to: ${saveTo}`;
+			} else {
+				const screenshot = await robot.getScreenshot();
+				require("fs").writeFileSync(saveTo, screenshot);
+				return `Screenshot saved to: ${saveTo}`;
+			}
 		}
 	);
 
@@ -637,6 +643,36 @@ export const createMcpServer = (): McpServer => {
 			} else {
 				return `No install parameters provided.`;
 			}
+		}
+	);
+
+	tool(
+		"mobile_start_video_recording",
+		"Start video recording on the mobile device (Android only).",
+		{
+			devicePath: z.string().describe("The path on the device to save the video (e.g., /sdcard/test.mp4)"),
+		},
+		async ({ devicePath }) => {
+			requireRobot();
+			if (!(robot instanceof AndroidRobot)) {
+				throw new ActionableError("Video recording is only supported on Android devices.");
+			}
+			await robot.startVideoRecording(devicePath);
+			return `Started video recording to: ${devicePath}`;
+		}
+	);
+
+	tool(
+		"mobile_stop_video_recording",
+		"Stop video recording on the mobile device (Android only).",
+		noParams.shape,
+		async () => {
+			requireRobot();
+			if (!(robot instanceof AndroidRobot)) {
+				throw new ActionableError("Video recording is only supported on Android devices.");
+			}
+			await robot.stopVideoRecording();
+			return `Stopped video recording.`;
 		}
 	);
 

@@ -71,6 +71,7 @@ const TIMEOUT = 30000;
 const MAX_BUFFER_SIZE = 1024 * 1024 * 4;
 
 export class AndroidRobot implements Robot {
+	private videoRecordingPid: number | null = null;
 
 	public constructor(private deviceId: string) {
 	}
@@ -239,7 +240,22 @@ export class AndroidRobot implements Robot {
 		this.adb("shell", "input", "swipe", `${x0}`, `${y0}`, `${x1}`, `${y1}`, "1000");
 	}
 
-	public async getScreenshot(): Promise<Buffer> {
+	public async saveScreenshotToFile(savePath: string): Promise<void> {
+		const deviceTmpPath = "/sdcard/__mcp_tmp_screenshot.png";
+		// Save screenshot to device
+		this.adb("shell", "screencap", "-p", deviceTmpPath);
+		// Pull screenshot to host
+		this.adb("pull", deviceTmpPath, savePath);
+		// Remove temp file from device
+		this.adb("shell", "rm", deviceTmpPath);
+	}
+
+	public async getScreenshot(savePath?: string): Promise<Buffer> {
+		if (savePath) {
+			await this.saveScreenshotToFile(savePath);
+			// Return the buffer for compatibility if needed
+			return require("fs").readFileSync(savePath);
+		}
 		return this.adb("exec-out", "screencap", "-p");
 	}
 
@@ -415,5 +431,31 @@ export class AndroidRobot implements Robot {
 			width: right - left,
 			height: bottom - top,
 		};
+	}
+
+	public async startVideoRecording(devicePath: string): Promise<void> {
+		if (this.videoRecordingPid !== null) {
+			throw new ActionableError("Video recording already in progress.");
+		}
+		const { spawn } = require("child_process");
+		const adbPath = getAdbPath();
+		const proc = spawn(adbPath, ["-s", this.deviceId, "shell", "screenrecord", devicePath], {
+			detached: true,
+			stdio: "ignore"
+		});
+		this.videoRecordingPid = proc.pid;
+		proc.unref();
+	}
+
+	public async stopVideoRecording(): Promise<void> {
+		if (this.videoRecordingPid === null) {
+			throw new ActionableError("No video recording in progress.");
+		}
+		try {
+			process.kill(this.videoRecordingPid);
+		} catch (e) {
+			// ignore if already killed
+		}
+		this.videoRecordingPid = null;
 	}
 }
