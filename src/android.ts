@@ -131,7 +131,30 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async launchApp(packageName: string): Promise<void> {
-		this.adb("shell", "monkey", "-p", packageName, "-c", "android.intent.category.LAUNCHER", "1");
+		// 1. Check if the package exists
+		const packages = await this.listPackages();
+		if (!packages.includes(packageName)) {
+			throw new ActionableError(`Package ${packageName} is not installed on the device.`);
+		}
+
+		// 2. Get the main activity of the package
+		let mainActivity = "";
+		try {
+			const output = this.adb("shell", "cmd", "package", "resolve-activity", "--brief", packageName)
+				.toString()
+				.trim()
+				.split("\n");
+			// The last line should be the component name: package/activity
+			mainActivity = output[output.length - 1];
+			if (!mainActivity.includes("/")) {
+				throw new Error();
+			}
+		} catch {
+			throw new ActionableError(`Could not resolve main activity for package ${packageName}.`);
+		}
+
+		// 3. Launch the app using the main activity
+		this.adb("shell", "am", "start", "-n", mainActivity);
 	}
 
 	public async listRunningProcesses(): Promise<string[]> {
@@ -152,29 +175,29 @@ export class AndroidRobot implements Robot {
 		switch (direction) {
 			case "up":
 				x0 = x1 = centerX;
-				y0 = Math.floor(screenSize.height * 0.80);
-				y1 = Math.floor(screenSize.height * 0.20);
+				y0 = Math.floor(screenSize.height * 0.90);
+				y1 = Math.floor(screenSize.height * 0.10);
 				break;
 			case "down":
 				x0 = x1 = centerX;
-				y0 = Math.floor(screenSize.height * 0.20);
-				y1 = Math.floor(screenSize.height * 0.80);
+				y0 = Math.floor(screenSize.height * 0.10);
+				y1 = Math.floor(screenSize.height * 0.90);
 				break;
 			case "left":
-				x0 = Math.floor(screenSize.width * 0.80);
-				x1 = Math.floor(screenSize.width * 0.20);
+				x0 = Math.floor(screenSize.width * 0.90);
+				x1 = Math.floor(screenSize.width * 0.10);
 				y0 = y1 = Math.floor(screenSize.height * 0.50);
 				break;
 			case "right":
-				x0 = Math.floor(screenSize.width * 0.20);
-				x1 = Math.floor(screenSize.width * 0.80);
+				x0 = Math.floor(screenSize.width * 0.10);
+				x1 = Math.floor(screenSize.width * 0.90);
 				y0 = y1 = Math.floor(screenSize.height * 0.50);
 				break;
 			default:
 				throw new ActionableError(`Swipe direction "${direction}" is not supported`);
 		}
 
-		this.adb("shell", "input", "swipe", `${x0}`, `${y0}`, `${x1}`, `${y1}`, "1000");
+		this.adb("shell", "input", "touchscreen", "swipe", `${x0}`, `${y0}`, `${x1}`, `${y1}`, "400");
 	}
 
 	public async swipeFromCoordinate(x: number, y: number, direction: SwipeDirection, distance?: number): Promise<void> {
@@ -346,6 +369,13 @@ export class AndroidRobot implements Robot {
 				break;
 			}
 		}
+	}
+
+	public async installApp(options: { apkPath?: string }): Promise<void> {
+		if (!options.apkPath) {
+			throw new ActionableError("You must provide apkPath to install an app on Android.");
+		}
+		this.adb("install", "-r", options.apkPath);
 	}
 
 	private async getUiAutomatorDump(): Promise<string> {

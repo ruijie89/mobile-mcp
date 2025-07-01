@@ -199,6 +199,14 @@ export class IosRobot implements Robot {
 	public async changeDevicePosture(posture: PostureStates): Promise<void> {
 		throw new ActionableError("Posture changing is not supported for iOS");
 	}
+
+	public async installApp(options: { testflightUrl?: string }): Promise<void> {
+		if (!options.testflightUrl) {
+			throw new ActionableError("You must provide testflightUrl to install an app on iOS device via TestFlight.");
+		}
+		// Open the TestFlight link in Safari
+		await this.openUrl(options.testflightUrl);
+	}
 }
 
 export class IosManager {

@@ -127,7 +127,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_use_default_device",
-		"Use the default device. This is a shortcut for mobile_use_device with deviceType=simulator and device=simulator_name",
+		"Selects and uses the default device if there is only one running device (real or virtual). This tool will fail if no devices or multiple devices are running.",
 		{
 			noParams
 		},
@@ -164,7 +164,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_launch_device",
-		"Launch or create and launch an Android emulator or iOS simulator. Parameters are unified for both platforms.",
+		"Launches an existing Android emulator or iOS simulator, or creates a new one if it doesn't exist. For Android, `systemImage` is required. For iOS, `runtimeId` is required. If a `name` is not provided, a default name will be generated.",
 		{
 			os: z.enum(["ios", "android"]),
 			systemImage: z.string().optional(), // Android system image path
@@ -198,8 +198,8 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_installed_devices",
-		"Use this tool when listing all installed mobile virtual devices, including Android emulators and iOS simulators. Provide the details",
+		"mobile_list_installed_virtual_devices",
+		"Lists all installed mobile virtual devices, including Android emulators and iOS simulators, with their details.",
 		{
 			noParams
 		},
@@ -229,7 +229,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_list_running_virtual_devices",
-		"Use this tool when listing all running virtual devices, including Android emulators and iOS simulators. Provide the ports if available.",
+		"Lists all running virtual devices (Android emulators and iOS simulators) and shows their state and connection details like ports.",
 		{
 			noParams
 		},
@@ -259,7 +259,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_list_all_running_devices",
-		"Use this tool when listing all running devices, including both physical & virtual devices. If there is more than one device returned, you need to let the user select one of them.",
+		"Lists all running devices, including both physical & virtual devices (simulators, emulators, real devices).",
 		{
 			noParams
 		},
@@ -297,7 +297,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_use_device",
-		"Select a device to use. This can be a simulator or an Android device. Use the list_available_devices tool to get a list of available devices.",
+		"Selects a device to use for subsequent commands. Use mobile_list_all_running_devices to see available devices.",
 		{
 			device: z.string().describe("The name of the device to select"),
 			deviceType: z.enum(["simulator", "ios", "android"]).describe("The type of device to select"),
@@ -320,6 +320,34 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
+		"mobile_terminate_virtual_device",
+		"Terminate a specified device (Android emulator or iOS simulator) by deviceId/uuid.",
+		{
+			deviceId: z.string().describe("The deviceId (for Android) or uuid (for iOS simulator) to terminate"),
+			deviceType: z.enum(["android", "simulator"]).describe("The type of device: 'android' for emulator, 'simulator' for iOS simulator"),
+		},
+		async ({ deviceId, deviceType }) => {
+			if (deviceType === "android") {
+				try {
+					AndroidDeviceManager.terminateEmulator(deviceId);
+					return `Terminated Android emulator: ${deviceId}`;
+				} catch (err: any) {
+					throw new ActionableError(`Failed to terminate Android emulator: ${err.message}`);
+				}
+			} else if (deviceType === "simulator") {
+				try {
+					SimctlManager.terminateSimulator(deviceId);
+					return `Terminated iOS simulator: ${deviceId}`;
+				} catch (err: any) {
+					throw new ActionableError(`Failed to terminate iOS simulator: ${err.message}`);
+				}
+			} else {
+				throw new ActionableError("Unsupported deviceType. Use 'android' or 'simulator'.");
+			}
+		}
+	);
+
+	tool(
 		"mobile_list_apps",
 		"List all the installed apps on the device",
 		{
@@ -334,7 +362,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_launch_app",
-		"Launch an app on mobile device. Use this to open a specific app. You can find the package name of the app by calling list_apps_on_device.",
+		"Launch an app on mobile device. Use this to open a specific app. You can find the package name of the app by calling mobile_list_apps.",
 		{
 			packageName: z.string().describe("The package name of the app to launch"),
 		},
@@ -449,13 +477,13 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"swipe_on_screen",
-		"Swipe on the screen",
+		"mobile_swipe_on_screen",
+		"Swipe on the screen in a given direction. Can swipe from the center of the screen or from a specified coordinate.",
 		{
 			direction: z.enum(["up", "down", "left", "right"]).describe("The direction to swipe"),
 			x: z.number().optional().describe("The x coordinate to start the swipe from, in pixels. If not provided, uses center of screen"),
 			y: z.number().optional().describe("The y coordinate to start the swipe from, in pixels. If not provided, uses center of screen"),
-			distance: z.number().optional().describe("The distance to swipe in pixels. Defaults to 400 pixels for iOS or 30% of screen dimension for Android"),
+			distance: z.number().optional().describe("The distance to swipe in pixels. Defaults to 50% of screen dimension for Android and iOS"),
 		},
 		async ({ direction, x, y, distance }) => {
 			requireRobot();
@@ -616,6 +644,29 @@ export const createMcpServer = (): McpServer => {
 				: "No iOS runtimes found.";
 
 			return `Available Android SDK system images:\n${androidList}\n\nAvailable iOS runtimes:\n${iosList}`;
+		}
+	);
+
+	tool(
+		"mobile_install_app",
+		"Install an app on the mobile device. For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl.",
+		{
+			apkPath: z.string().optional().describe("Path to the APK file for Android."),
+			ipaPath: z.string().optional().describe("Path to the IPA file for iOS simulator."),
+			testflightUrl: z.string().optional().describe("TestFlight public link for iOS device."),
+		},
+		async ({ apkPath, ipaPath, testflightUrl }) => {
+			requireRobot();
+			await robot!.installApp({ apkPath, ipaPath, testflightUrl });
+			if (apkPath) {
+				return `Attempted to install APK: ${apkPath}`;
+			} else if (ipaPath) {
+				return `Attempted to install IPA: ${ipaPath}`;
+			} else if (testflightUrl) {
+				return `Attempted to open TestFlight link: ${testflightUrl}`;
+			} else {
+				return `No install parameters provided.`;
+			}
 		}
 	);
 
