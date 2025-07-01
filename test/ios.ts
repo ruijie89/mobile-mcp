@@ -25,4 +25,25 @@ describe("ios", async () => {
 		assert.equal(Math.ceil(pngSize.width / screenSize.scale), screenSize.width);
 		assert.equal(Math.ceil(pngSize.height / screenSize.scale), screenSize.height);
 	});
+
+	it("should be able to save a screenshot to file", async function() {
+		hasOneDevice || this.skip();
+		const savePath = "./test_ios_screenshot.png";
+		const fs = require("fs");
+		const screenshot = await robot.getScreenshot();
+		fs.writeFileSync(savePath, screenshot);
+		assert.ok(fs.existsSync(savePath), "Screenshot file should exist");
+		fs.unlinkSync(savePath);
+	});
+
+	it("should skip video recording as not supported on physical iOS", async function() {
+		hasOneDevice || this.skip();
+		try {
+			await robot.startVideoRecording("/tmp/test_ios_video.mp4");
+			assert.fail("Should not support video recording on physical iOS");
+		} catch (e) {
+			const msg = typeof e === "object" && e && "message" in e ? (e as any).message : String(e);
+			assert.ok(msg.includes("not supported"));
+		}
+	});
 });

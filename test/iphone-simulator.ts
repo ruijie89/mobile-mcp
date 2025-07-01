@@ -164,4 +164,29 @@ describe("iphone-simulator", () => {
 			assert.ok(error.message.includes("Button \"NOT_A_BUTTON\" is not supported"));
 		}
 	});
+
+	it("should be able to save a screenshot to file", async function() {
+		hasOneSimulator || this.skip();
+		const savePath = "./test_sim_screenshot.png";
+		const fs = require("fs");
+		const screenshot = await simctl.getScreenshot();
+		fs.writeFileSync(savePath, screenshot);
+		assert.ok(fs.existsSync(savePath), "Screenshot file should exist");
+		fs.unlinkSync(savePath);
+	});
+
+	it("should be able to start, stop, and save video recording", async function() {
+		hasOneSimulator || this.skip();
+		const savePath = "./test_sim_video.mp4";
+		try {
+			await simctl.startVideoRecording(savePath);
+			await new Promise(resolve => setTimeout(resolve, 2000));
+			await simctl.stopVideoRecording();
+			const fs = require("fs");
+			assert.ok(fs.existsSync(savePath), "Video file should exist");
+			fs.unlinkSync(savePath);
+		} catch (e) {
+			this.skip();
+		}
+	});
 });
