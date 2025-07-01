@@ -3,9 +3,10 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { z, ZodRawShape, ZodTypeAny } from "zod";
 import os from "node:os";
 import crypto from "node:crypto";
+import { execFileSync } from "child_process";
 
 import { error, trace } from "./logger";
-import { AndroidRobot } from "./android";
+import { AndroidRobot, getAdbPath } from "./android";
 import { ActionableError, Robot } from "./robot";
 import { SimctlManager } from "./iphone-simulator";
 import { IosManager, IosRobot } from "./ios";
@@ -300,11 +301,39 @@ export const createMcpServer = (): McpServer => {
 				case "ios":
 					robot = new IosRobot(device);
 					break;
-				case "android":
-					robot = new AndroidRobot(device);
+				case "android": {
+					const androidManager = new AndroidDeviceManager();
+					const runningDevices = androidManager.getAllConnectedDevices();
+					const input = device;
+					// If input is a running device ID, use it directly
+					const isDeviceId = runningDevices.some(dev => dev.deviceId === input);
+					if (isDeviceId) {
+						robot = new AndroidRobot(input);
+						break;
+					}
+					// Otherwise, treat input as AVD name and map to device ID
+					const avdName = input;
+					let matchedDeviceId = null;
+					for (const dev of runningDevices) {
+						if (dev.deviceId.startsWith("emulator-")) {
+							try {
+								const avd = execFileSync(getAdbPath(), ["-s", dev.deviceId, "emu", "avd", "name"]).toString().trim();
+								if (avd === avdName) {
+									matchedDeviceId = dev.deviceId;
+									break;
+								}
+							} catch (e) {
+								// ignore
+							}
+						}
+					}
+					if (!matchedDeviceId) {
+						throw new ActionableError(`No running emulator found for AVD name: ${avdName}`);
+					}
+					robot = new AndroidRobot(matchedDeviceId);
 					break;
+				}
 			}
-
 			return `Selected device: ${device}`;
 		}
 	);
@@ -650,8 +679,8 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_change_posture",
-		"Fold or unfold the device.",
+		"mobile_change_virtual_device_posture",
+		"Fold or unfold the virtual device (Android only) using the device id (emulator-port number, eg emulator-5554).",
 		{
 			posture: z.enum(["fold", "unfold"]).describe("The desired posture")
 		},
