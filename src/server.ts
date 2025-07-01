@@ -198,7 +198,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_list_created_mobile_devices",
-		"List all created mobile virtual devices, including Android avd emulators and iOS simulators, with their details.",
+		"List all created mobile virtual devices, including AVD emulators and iOS simulators, with their details.",
 		{
 			noParams
 		},
@@ -227,8 +227,8 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_all_running_devices",
-		"List all running devices, including both physical & virtual devices (simulators, avd emulators, real devices).",
+		"mobile_list_running_devices",
+		"List all running devices, including both physical & virtual devices (simulators, AVD emulators, real devices).",
 		{
 			noParams
 		},
@@ -373,6 +373,29 @@ export const createMcpServer = (): McpServer => {
 			requireRobot();
 			await robot!.terminateApp(packageName);
 			return `Terminated app ${packageName}`;
+		}
+	);
+
+	tool(
+		"mobile_install_app",
+		"Install an app on the mobile device. For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl. Use absolute path when providing apkPath or ipaPath.",
+		{
+			apkPath: z.string().optional().describe("Path to the APK file for Android."),
+			ipaPath: z.string().optional().describe("Path to the IPA file for iOS simulator."),
+			testflightUrl: z.string().optional().describe("TestFlight public link for iOS device."),
+		},
+		async ({ apkPath, ipaPath, testflightUrl }) => {
+			requireRobot();
+			await robot!.installApp({ apkPath, ipaPath, testflightUrl });
+			if (apkPath) {
+				return `Attempted to install APK: ${apkPath}`;
+			} else if (ipaPath) {
+				return `Attempted to install IPA: ${ipaPath}`;
+			} else if (testflightUrl) {
+				return `Attempted to open TestFlight link: ${testflightUrl}`;
+			} else {
+				return `No install parameters provided.`;
+			}
 		}
 	);
 
@@ -640,29 +663,6 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_install_app",
-		"Install an app on the mobile device. For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl.",
-		{
-			apkPath: z.string().optional().describe("Path to the APK file for Android."),
-			ipaPath: z.string().optional().describe("Path to the IPA file for iOS simulator."),
-			testflightUrl: z.string().optional().describe("TestFlight public link for iOS device."),
-		},
-		async ({ apkPath, ipaPath, testflightUrl }) => {
-			requireRobot();
-			await robot!.installApp({ apkPath, ipaPath, testflightUrl });
-			if (apkPath) {
-				return `Attempted to install APK: ${apkPath}`;
-			} else if (ipaPath) {
-				return `Attempted to install IPA: ${ipaPath}`;
-			} else if (testflightUrl) {
-				return `Attempted to open TestFlight link: ${testflightUrl}`;
-			} else {
-				return `No install parameters provided.`;
-			}
-		}
-	);
-
-	tool(
 		"mobile_start_video_recording",
 		"Start video recording on the mobile device (Android only).",
 		{
@@ -692,6 +692,22 @@ export const createMcpServer = (): McpServer => {
 		}
 	);
 
+	tool(
+		"mobile_save_and_cleanup_video_recording",
+		"Save a video recording from the device to a file on the host and remove it from the device (Android only).",
+		{
+			devicePath: z.string().describe("The path of the video on the device (e.g., /sdcard/recording.mp4)"),
+			saveTo: z.string().describe("The path on the host to save the video to"),
+		},
+		async ({ devicePath, saveTo }) => {
+			requireRobot();
+			if (!(robot instanceof AndroidRobot)) {
+				throw new ActionableError("This tool is only supported on Android devices.");
+			}
+			await robot.saveAndCleanupVideoRecording(devicePath, saveTo);
+			return `Video recording saved to: ${saveTo} and removed from device (${devicePath})`;
+		}
+	);
 
 	// async check for latest agent version
 	checkForLatestAgentVersion().then();

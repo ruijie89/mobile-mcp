@@ -462,4 +462,16 @@ export class AndroidRobot implements Robot {
 	public async uninstallApp(packageName: string): Promise<void> {
 		this.adb("shell", "pm", "uninstall", packageName);
 	}
+
+	/**
+	 * Save a video recording from the device to the host and remove it from the device.
+	 * @param devicePath The path of the video on the device (e.g., /sdcard/recording.mp4)
+	 * @param savePath The path on the host to save the video to
+	 */
+	public async saveAndCleanupVideoRecording(devicePath: string, savePath: string): Promise<void> {
+		// Pull video to host
+		this.adb("pull", devicePath, savePath);
+		// Remove video from device
+		this.adb("shell", "rm", devicePath);
+	}
 }
