@@ -664,31 +664,35 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"mobile_start_video_recording",
-		"Start video recording on the mobile device (Android only).",
+		"Start video recording on the mobile device (Android or iOS simulator).",
 		{
-			devicePath: z.string().describe("The path on the device to save the video (e.g., /sdcard/test.mp4)"),
+			devicePath: z.string().describe("The path on the device to save the video (e.g., /sdcard/test.mp4) for Android, or the path to save the video on host for iOS simulator."),
 		},
 		async ({ devicePath }) => {
 			requireRobot();
-			if (!(robot instanceof AndroidRobot)) {
-				throw new ActionableError("Video recording is only supported on Android devices.");
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+			if (typeof robot.startVideoRecording === "function") {
+				await robot.startVideoRecording(devicePath);
+				return `Started video recording to: ${devicePath}`;
+			} else {
+				throw new ActionableError("Video recording is not supported on this device type.");
 			}
-			await robot.startVideoRecording(devicePath);
-			return `Started video recording to: ${devicePath}`;
 		}
 	);
 
 	tool(
 		"mobile_stop_video_recording",
-		"Stop video recording on the mobile device (Android only).",
+		"Stop video recording on the mobile device (Android or iOS simulator).",
 		noParams.shape,
 		async () => {
 			requireRobot();
-			if (!(robot instanceof AndroidRobot)) {
-				throw new ActionableError("Video recording is only supported on Android devices.");
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+			if (typeof robot.stopVideoRecording === "function") {
+				await robot.stopVideoRecording();
+				return `Stopped video recording.`;
+			} else {
+				throw new ActionableError("Video recording is not supported on this device type.");
 			}
-			await robot.stopVideoRecording();
-			return `Stopped video recording.`;
 		}
 	);
 

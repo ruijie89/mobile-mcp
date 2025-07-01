@@ -44,6 +44,8 @@ const MAX_BUFFER_SIZE = 1024 * 1024 * 4;
 
 export class Simctl implements Robot {
 
+	private videoRecordingProc: any = null;
+
 	constructor(private readonly simulatorUuid: string) {}
 
 	private async isWdaInstalled(): Promise<boolean> {
@@ -193,6 +195,46 @@ export class Simctl implements Robot {
 
 	public async uninstallApp(bundleIdentifier: string): Promise<void> {
 		this.simctl("uninstall", this.simulatorUuid, bundleIdentifier);
+	}
+
+	/**
+	 * Start video recording on the iOS simulator.
+	 * @param savePath The path to save the video file (e.g., /path/to/video.mov)
+	 */
+	public async startVideoRecording(savePath: string): Promise<void> {
+		if (!savePath) {
+			throw new ActionableError("Video recording path must be provided.");
+		}
+		if (this.videoRecordingProc) {
+			throw new ActionableError("Video recording already in progress.");
+		}
+		// Ensure the file extension is .mp4
+		let mp4Path = savePath;
+		if (!mp4Path.endsWith(".mp4")) {
+			mp4Path = mp4Path.replace(/\.[^/.]+$/, "") + ".mp4";
+		}
+		const { spawn } = require("child_process");
+		const proc = spawn("xcrun", ["simctl", "io", this.simulatorUuid, "recordVideo", mp4Path], {
+			detached: true,
+			stdio: "ignore"
+		});
+		this.videoRecordingProc = proc;
+		proc.unref();
+	}
+
+	/**
+	 * Stop video recording on the iOS simulator.
+	 */
+	public async stopVideoRecording(): Promise<void> {
+		if (!this.videoRecordingProc) {
+			throw new ActionableError("No video recording in progress.");
+		}
+		try {
+			process.kill(this.videoRecordingProc.pid, "SIGINT");
+		} catch (e) {
+			// ignore if already killed
+		}
+		this.videoRecordingProc = null;
 	}
 }
 

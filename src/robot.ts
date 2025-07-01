@@ -139,4 +139,15 @@ export interface Robot {
 	 * @param appIdentifier The unique application identifier (Android: package name, iOS: bundle identifier)
 	 */
 	uninstallApp(appIdentifier: string): Promise<void>;
+
+	/**
+	 * Start video recording on the device.
+	 * @param path The path to save the video file (Android: device path, iOS: host path)
+	 */
+	startVideoRecording(path: string): Promise<void>;
+
+	/**
+	 * Stop video recording on the device.
+	 */
+	stopVideoRecording(): Promise<void>;
 }
