@@ -207,6 +207,19 @@ export class IosRobot implements Robot {
 		// Open the TestFlight link in Safari
 		await this.openUrl(options.testflightUrl);
 	}
+
+	public async uninstallApp(bundleIdentifier: string): Promise<void> {
+		await this.assertTunnelRunning();
+		await this.ios("uninstall", bundleIdentifier);
+	}
+
+	public async startVideoRecording(_path: string): Promise<void> {
+		throw new ActionableError("Video recording is not supported for physical iOS devices.");
+	}
+
+	public async stopVideoRecording(): Promise<void> {
+		throw new ActionableError("Video recording is not supported for physical iOS devices.");
+	}
 }
 
 export class IosManager {

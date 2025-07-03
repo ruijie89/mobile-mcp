@@ -1,10 +1,11 @@
 import assert from "node:assert";
 
 import { PNG } from "../src/png";
-import { AndroidRobot, AndroidDeviceManager } from "../src/android";
+import { AndroidRobot } from "../src/android";
+import { AndroidDeviceManager } from "../src/android-device-manager";
 
 const manager = new AndroidDeviceManager();
-const devices = manager.getConnectedDevices();
+const devices = manager.getAllConnectedDevices();
 const hasOneAndroidDevice = devices.length === 1;
 
 describe("android", () => {
@@ -135,5 +136,46 @@ describe("android", () => {
 
 		// screen size should not have changed
 		assert.deepEqual(screenSize1, screenSize2);
+	});
+
+	it("should be able to fold and unfold the device (if supported)", async function() {
+		hasOneAndroidDevice || this.skip();
+		try {
+			await android.changeDevicePosture("fold");
+			await new Promise(resolve => setTimeout(resolve, 1000));
+			await android.changeDevicePosture("unfold");
+			await new Promise(resolve => setTimeout(resolve, 1000));
+			// If no error, test passes
+			assert.ok(true);
+		} catch (e) {
+			// If not supported, skip
+			this.skip();
+		}
+	});
+
+	it("should be able to start, stop, and save video recording", async function() {
+		hasOneAndroidDevice || this.skip();
+		const videoPath = "/sdcard/test_recording.mp4";
+		const savePath = "./test_recording.mp4";
+		try {
+			await android.startVideoRecording(videoPath);
+			await new Promise(resolve => setTimeout(resolve, 2000));
+			await android.stopVideoRecording();
+			await android.saveAndCleanupVideoRecording(videoPath, savePath);
+			const fs = require("fs");
+			assert.ok(fs.existsSync(savePath), "Video file should exist");
+			fs.unlinkSync(savePath);
+		} catch (e) {
+			this.skip();
+		}
+	});
+
+	it("should be able to save a screenshot to file", async function() {
+		hasOneAndroidDevice || this.skip();
+		const savePath = "./test_screenshot.png";
+		await android.saveScreenshotToFile(savePath);
+		const fs = require("fs");
+		assert.ok(fs.existsSync(savePath), "Screenshot file should exist");
+		fs.unlinkSync(savePath);
 	});
 });

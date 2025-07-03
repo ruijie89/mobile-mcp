@@ -133,4 +133,21 @@ export interface Robot {
 	 * For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl.
 	 */
 	installApp(options: { apkPath?: string; ipaPath?: string; testflightUrl?: string }): Promise<void>;
+
+	/**
+	 * Uninstall an app from the device.
+	 * @param appIdentifier The unique application identifier (Android: package name, iOS: bundle identifier)
+	 */
+	uninstallApp(appIdentifier: string): Promise<void>;
+
+	/**
+	 * Start video recording on the device.
+	 * @param path The path to save the video file (Android: device path, iOS: host path)
+	 */
+	startVideoRecording(path: string): Promise<void>;
+
+	/**
+	 * Stop video recording on the device.
+	 */
+	stopVideoRecording(): Promise<void>;
 }

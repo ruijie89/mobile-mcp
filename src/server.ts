@@ -1,12 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { z, ZodRawShape, ZodTypeAny } from "zod";
-import fs from "node:fs";
 import os from "node:os";
 import crypto from "node:crypto";
+import { execFileSync } from "child_process";
 
 import { error, trace } from "./logger";
-import { AndroidRobot } from "./android";
+import { AndroidRobot, getAdbPath } from "./android";
 import { ActionableError, Robot } from "./robot";
 import { SimctlManager } from "./iphone-simulator";
 import { IosManager, IosRobot } from "./ios";
@@ -198,8 +198,8 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_installed_virtual_devices",
-		"Lists all installed mobile virtual devices, including Android emulators and iOS simulators, with their details.",
+		"mobile_list_created_mobile_devices",
+		"List all created mobile virtual devices, including AVD emulators and iOS simulators, with their details.",
 		{
 			noParams
 		},
@@ -228,38 +228,8 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_running_virtual_devices",
-		"Lists all running virtual devices (Android emulators and iOS simulators) and shows their state and connection details like ports.",
-		{
-			noParams
-		},
-		async ({}) => {
-			const simulators = simulatorManager.listBootedSimulators().map(
-				simulator =>
-					`${simulator.name} State: ${simulator.state})`,
-			);
-
-			const emulators = emulatorManager.getConnectedAVDs().map(
-				emulator =>
-					`${emulator.deviceId} (Port: ${emulator.port})`,
-			);
-
-			const resp = ["Found these devices:"];
-			if (simulators.length > 0) {
-				resp.push(`iOS simulators: [${simulators.join(".")}]`);
-			}
-
-			if (emulators.length > 0) {
-				resp.push(`Android emulators: [${emulators.join(",")}]`);
-			}
-
-			return resp.join("\n");
-		}
-	);
-
-	tool(
-		"mobile_list_all_running_devices",
-		"Lists all running devices, including both physical & virtual devices (simulators, emulators, real devices).",
+		"mobile_list_running_devices",
+		"List all running devices, including both physical & virtual devices (simulators, AVD emulators, real devices).",
 		{
 			noParams
 		},
@@ -296,6 +266,27 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
+		"mobile_list_mobile_system_images",
+		"List the available SDKs to create AVDs in Android, and list the available runtimes for simctl to create simulators for iOS. Use this only when there's no existing device and need to create new avd emulators or simulators.",
+		{
+			noParams
+		},
+		async ({}) => {
+			const androidSdks = emulatorManager.listAvailableAndroidSdks();
+			const iosRuntimes = simulatorManager.listAvailableIosRuntimes();
+
+			const androidList = androidSdks.length > 0
+				? androidSdks.map(sdk => `- ${sdk.path}: ${sdk.description}`).join("\n")
+				: "No Android system images found.";
+			const iosList = iosRuntimes.length > 0
+				? iosRuntimes.map((rt: { name: string; identifier: string }) => `- ${rt.name} (${rt.identifier})`).join("\n")
+				: "No iOS runtimes found.";
+
+			return `Available Android SDK system images:\n${androidList}\n\nAvailable iOS runtimes:\n${iosList}`;
+		}
+	);
+
+	tool(
 		"mobile_use_device",
 		"Selects a device to use for subsequent commands. Use mobile_list_all_running_devices to see available devices.",
 		{
@@ -310,11 +301,39 @@ export const createMcpServer = (): McpServer => {
 				case "ios":
 					robot = new IosRobot(device);
 					break;
-				case "android":
-					robot = new AndroidRobot(device);
+				case "android": {
+					const androidManager = new AndroidDeviceManager();
+					const runningDevices = androidManager.getAllConnectedDevices();
+					const input = device;
+					// If input is a running device ID, use it directly
+					const isDeviceId = runningDevices.some(dev => dev.deviceId === input);
+					if (isDeviceId) {
+						robot = new AndroidRobot(input);
+						break;
+					}
+					// Otherwise, treat input as AVD name and map to device ID
+					const avdName = input;
+					let matchedDeviceId = null;
+					for (const dev of runningDevices) {
+						if (dev.deviceId.startsWith("emulator-")) {
+							try {
+								const avd = execFileSync(getAdbPath(), ["-s", dev.deviceId, "emu", "avd", "name"]).toString().trim();
+								if (avd === avdName) {
+									matchedDeviceId = dev.deviceId;
+									break;
+								}
+							} catch (e) {
+								// ignore
+							}
+						}
+					}
+					if (!matchedDeviceId) {
+						throw new ActionableError(`No running emulator found for AVD name: ${avdName}`);
+					}
+					robot = new AndroidRobot(matchedDeviceId);
 					break;
+				}
 			}
-
 			return `Selected device: ${device}`;
 		}
 	);
@@ -383,6 +402,45 @@ export const createMcpServer = (): McpServer => {
 			requireRobot();
 			await robot!.terminateApp(packageName);
 			return `Terminated app ${packageName}`;
+		}
+	);
+
+	tool(
+		"mobile_install_app",
+		"Install an app on the mobile device. For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl. Use absolute path when providing apkPath or ipaPath.",
+		{
+			apkPath: z.string().optional().describe("Path to the APK file for Android."),
+			ipaPath: z.string().optional().describe("Path to the IPA file for iOS simulator."),
+			testflightUrl: z.string().optional().describe("TestFlight public link for iOS device."),
+		},
+		async ({ apkPath, ipaPath, testflightUrl }) => {
+			requireRobot();
+			await robot!.installApp({ apkPath, ipaPath, testflightUrl });
+			if (apkPath) {
+				return `Attempted to install APK: ${apkPath}`;
+			} else if (ipaPath) {
+				return `Attempted to install IPA: ${ipaPath}`;
+			} else if (testflightUrl) {
+				return `Attempted to open TestFlight link: ${testflightUrl}`;
+			} else {
+				return `No install parameters provided.`;
+			}
+		}
+	);
+
+	tool(
+		"mobile_uninstall_app",
+		"Uninstall an app from the mobile device. Provide the package name (Android) or the bundle identifier (iOS) of the app to uninstall.",
+		{
+			appIdentifier: z.string().describe("The package name (Android) or bundle identifier (iOS) of the app to uninstall"),
+		},
+		async ({ appIdentifier }) => {
+			requireRobot();
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+
+			await robot!.uninstallApp(appIdentifier);
+			return `Uninstalled app ${appIdentifier}.`;
+
 		}
 	);
 
@@ -529,9 +587,16 @@ export const createMcpServer = (): McpServer => {
 		async ({ saveTo }) => {
 			requireRobot();
 
-			const screenshot = await robot!.getScreenshot();
-			fs.writeFileSync(saveTo, screenshot);
-			return `Screenshot saved to: ${saveTo}`;
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+
+			if (robot instanceof AndroidRobot) {
+				await robot.saveScreenshotToFile(saveTo);
+				return `Screenshot saved to: ${saveTo}`;
+			} else {
+				const screenshot = await robot.getScreenshot();
+				require("fs").writeFileSync(saveTo, screenshot);
+				return `Screenshot saved to: ${saveTo}`;
+			}
 		}
 	);
 
@@ -614,8 +679,8 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_change_posture",
-		"Fold or unfold the device.",
+		"mobile_change_virtual_device_posture",
+		"Fold or unfold the virtual device (Android only) using the device id (emulator-port number, eg emulator-5554).",
 		{
 			posture: z.enum(["fold", "unfold"]).describe("The desired posture")
 		},
@@ -627,46 +692,53 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"mobile_list_mobile_system_images",
-		"List the available SDKs to create AVDs in Android, and list the available runtimes for simctl to create simulators for iOS.",
+		"mobile_start_video_recording",
+		"Start video recording on the mobile device (Android or iOS simulator).",
 		{
-			noParams
+			devicePath: z.string().describe("The path on the device to save the video (e.g., /sdcard/test.mp4) for Android, or the path to save the video on host for iOS simulator."),
 		},
-		async ({}) => {
-			const androidSdks = emulatorManager.listAvailableAndroidSdks();
-			const iosRuntimes = simulatorManager.listAvailableIosRuntimes();
-
-			const androidList = androidSdks.length > 0
-				? androidSdks.map(sdk => `- ${sdk.path}: ${sdk.description}`).join("\n")
-				: "No Android system images found.";
-			const iosList = iosRuntimes.length > 0
-				? iosRuntimes.map((rt: { name: string; identifier: string }) => `- ${rt.name} (${rt.identifier})`).join("\n")
-				: "No iOS runtimes found.";
-
-			return `Available Android SDK system images:\n${androidList}\n\nAvailable iOS runtimes:\n${iosList}`;
+		async ({ devicePath }) => {
+			requireRobot();
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+			if (typeof robot.startVideoRecording === "function") {
+				await robot.startVideoRecording(devicePath);
+				return `Started video recording to: ${devicePath}`;
+			} else {
+				throw new ActionableError("Video recording is not supported on this device type.");
+			}
 		}
 	);
 
 	tool(
-		"mobile_install_app",
-		"Install an app on the mobile device. For Android, provide apkPath. For iOS simulator, provide ipaPath. For iOS device, provide testflightUrl.",
-		{
-			apkPath: z.string().optional().describe("Path to the APK file for Android."),
-			ipaPath: z.string().optional().describe("Path to the IPA file for iOS simulator."),
-			testflightUrl: z.string().optional().describe("TestFlight public link for iOS device."),
-		},
-		async ({ apkPath, ipaPath, testflightUrl }) => {
+		"mobile_stop_video_recording",
+		"Stop video recording on the mobile device (Android or iOS simulator).",
+		noParams.shape,
+		async () => {
 			requireRobot();
-			await robot!.installApp({ apkPath, ipaPath, testflightUrl });
-			if (apkPath) {
-				return `Attempted to install APK: ${apkPath}`;
-			} else if (ipaPath) {
-				return `Attempted to install IPA: ${ipaPath}`;
-			} else if (testflightUrl) {
-				return `Attempted to open TestFlight link: ${testflightUrl}`;
+			if (!robot) {throw new ActionableError("No device selected. Use the mobile_use_device tool to select a device.");}
+			if (typeof robot.stopVideoRecording === "function") {
+				await robot.stopVideoRecording();
+				return `Stopped video recording.`;
 			} else {
-				return `No install parameters provided.`;
+				throw new ActionableError("Video recording is not supported on this device type.");
 			}
+		}
+	);
+
+	tool(
+		"mobile_save_and_cleanup_video_recording",
+		"Save a video recording from the device to a file on the host and remove it from the device (Android only).",
+		{
+			devicePath: z.string().describe("The path of the video on the device (e.g., /sdcard/recording.mp4)"),
+			saveTo: z.string().describe("The path on the host to save the video to"),
+		},
+		async ({ devicePath, saveTo }) => {
+			requireRobot();
+			if (!(robot instanceof AndroidRobot)) {
+				throw new ActionableError("This tool is only supported on Android devices.");
+			}
+			await robot.saveAndCleanupVideoRecording(devicePath, saveTo);
+			return `Video recording saved to: ${saveTo} and removed from device (${devicePath})`;
 		}
 	);
 
